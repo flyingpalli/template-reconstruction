@@ -27,14 +27,14 @@ class Network(nn.Module):
             kernel_size=kernel_size,
             padding=kernel_size // 2,
         )
-        self.conv_bn1 = nn.BatchNorm1d(hidden_dim)
+        self.bn1 = nn.BatchNorm1d(hidden_dim)
         self.conv2 = nn.Conv1d(
             in_channels=hidden_dim,
             out_channels=hidden_dim,
             kernel_size=kernel_size,
             padding=1,
         )
-        self.conv_bn2 = nn.BatchNorm1d(hidden_dim)
+        self.bn2 = nn.BatchNorm1d(hidden_dim)
         self.relu = nn.ReLU()
 
         encoder_layer = nn.TransformerEncoderLayer(
