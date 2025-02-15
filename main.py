@@ -106,6 +106,7 @@ if __name__ == "__main__":
             batch_size=BATCH_SIZE,
             num_workers=1,
             shuffle=True,
+            generator=torch.Generator(device=device),
         )
         losses = 0
         for i, (x, y) in enumerate(dataloader):
