@@ -25,6 +25,7 @@ def _get_nth_entry(path: os.PathLike, n: int):
 class Network(nn.Module):
     def __init__(
         self,
+        device='cpu',
         input_dim=1071,
         output_dim=51,
         hidden_dim=256,
@@ -63,15 +64,15 @@ class Network(nn.Module):
     def forward(self, x):
         # x = self.dropout(x)
 
-        x = x.unsqueeze(1)
-        x = self.relu(self.conv_bn(self.conv1(x)))
-        x = self.relu(self.conv_bn(self.conv2(x)))
+        x = x.unsqueeze(1).to(device)
+        x = self.relu(self.conv_bn(self.conv1(x.to(device)).to(device)).to(device)).to(device)
+        x = self.relu(self.conv_bn(self.conv2(x.to(device)))).to(device)
 
         x = x.permute(2, 0, 1)
-        x = self.transformer(x)
+        x = self.transformer(x).to(device)
 
-        x = x.mean(dim=0)
-        x = self.fc(x)
+        x = x.mean(dim=0).to(device)
+        x = self.fc(x).to(device)
         return x
 
         # x = F.sigmoid(self.fc_first(x))
@@ -88,14 +89,16 @@ if __name__ == "__main__":
     LOSVD = "./data/losvd_split/losvd_scaled"
     SPECTRUM = "./data/spec_split/spec"
 
-    loss_f = nn.MSELoss(reduction="sum")
     torch.set_default_dtype(torch.float64)
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
     torch.set_default_device(device)
+    torch.multiprocessing.set_start_method('spawn')
     print("Using device:", device)
 
-    network = Network()
+    loss_f = nn.MSELoss(reduction="sum")
+
+    network = Network(device=device)
     optimizer = optim.Adam(network.parameters(), lr=LR)
 
     for file in range(20):
@@ -110,8 +113,8 @@ if __name__ == "__main__":
         )
         losses = 0
         for i, (x, y) in enumerate(dataloader):
-            y_pred = network(x)
-            loss = loss_f(y_pred, y)
+            y_pred = network(x).to(device)
+            loss = loss_f(y_pred.to(device), y.to(device))
 
             optimizer.zero_grad()
             loss.backward()
