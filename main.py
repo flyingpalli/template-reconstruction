@@ -1,11 +1,7 @@
-import os.path
-
 import duckdb
-import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
@@ -44,15 +40,7 @@ class Network(nn.Module):
 
         self.fc = nn.Linear(hidden_dim, output_dim)
 
-        # self.fc_first = nn.Linear(input_dim, hidden_dim)
-        # self.hidden_layers = nn.ModuleList()
-        # for _ in range(n_layers):
-        #     self.hidden_layers.append(nn.Linear(hidden_dim, hidden_dim))
-        # self.fc_last = nn.Linear(hidden_dim, output_dim)
-
     def forward(self, x):
-        # x = self.dropout(x)
-
         x = x.unsqueeze(1)
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.relu(self.bn2(self.conv2(x)))
@@ -63,12 +51,6 @@ class Network(nn.Module):
         x = x.mean(dim=0)
         x = self.fc(x)
         return x
-
-        # x = F.sigmoid(self.fc_first(x))
-        # for layer in self.hidden_layers:
-        #     x = F.sigmoid(layer(x))
-        # x = self.fc_last(x)
-        # return x
 
 
 if __name__ == "__main__":
@@ -108,10 +90,9 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             pred = network(x.to(device))
             loss = loss_f(pred, target.to(device))
+            losses += loss
             loss.backward()
             optimizer.step()
-            print(" step:", file * 50000 + i, "    loss:", loss.item())
-            # losses += loss.item()
-            # if i % 100 == 0:
-            #     print(" step:", file * 50000 + i, "    loss:", losses / 100)
-            #     losses = 0
+            if i % 10 == 0:
+                print(f"Step {50000 * file + i}, Loss: {losses / 10:.2f}")
+                losses = 0
