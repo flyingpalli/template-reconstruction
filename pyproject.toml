@@ -13,8 +13,6 @@ profile = "black"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-numpy = "^2.2.1"
-pandas = "^2.2.3"
 torch = "^2.5.1"
 duckdb = "^1.1.3"
 
