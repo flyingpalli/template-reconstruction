@@ -14,7 +14,7 @@ class Network(nn.Module):
         input_dim=1071,
         output_dim=51,
         hidden_dim=256,
-        num_layers=5,
+        num_layers=10,
         n_heads=8,
         kernel_size=50,
     ):
