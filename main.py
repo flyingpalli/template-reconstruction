@@ -2,7 +2,10 @@ import duckdb
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import typer
 from torch.utils.data import DataLoader
+
+app = typer.Typer()
 
 
 class Network(nn.Module):
@@ -52,7 +55,8 @@ class Network(nn.Module):
         return x
 
 
-if __name__ == "__main__":
+@app.command()
+def main():
     BATCH_SIZE = 1
     LR = 1e-5
     LOSVD = "./data/losvd_split/losvd_scaled"
@@ -95,3 +99,7 @@ if __name__ == "__main__":
             if i % 10 == 0:
                 print(f"Step {50000 * file + i}, Loss: {losses / 10:.2f}")
                 losses = 0
+
+
+if __name__ == "__main__":
+    app()
