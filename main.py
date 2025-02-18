@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import re
 import time
 
 import duckdb
@@ -92,11 +93,36 @@ def load_model_all(state_dict: dict, path: str, device) -> None:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument("--lr", type=float, default=1e-5)
-    parser.add_argument("--losvd", type=str, default="./data/losvd_split/losvd_scaled")
-    parser.add_argument("--spectrum", type=str, default="./data/spec_split/spec")
-    parser.add_argument("--log-level", default="INFO")
+    parser.add_argument(
+        "--batch-size", type=int, default=1, help="Batchsize for supervised learning"
+    )
+    parser.add_argument(
+        "--lr", type=float, default=1e-5, help="Learning rate of the optimizer"
+    )
+    parser.add_argument(
+        "--losvd",
+        type=str,
+        default="./data/losvd_split/losvd_scaled",
+        help="Directory which contains the losvd files",
+    )
+    parser.add_argument(
+        "--spectrum",
+        type=str,
+        default="./data/spec_split/spec",
+        help="Directory which contains the spec files",
+    )
+    parser.add_argument(
+        "--log-level", type=str, default="INFO", help="Level of the console logger"
+    )
+    parser.add_argument(
+        "--file-size", type=int, default=50000, help="Amount of lines per file"
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="",
+        help="Path of the model, when pre-loading is desired",
+    )
     args = parser.parse_args()
 
     run_name = f"tempRecon__{int(time.time())}"
@@ -123,7 +149,17 @@ def main():
         network = Network().to(device)
         optimizer = optim.Adam(network.parameters(), lr=args.lr)
 
-        for file in range(20):
+        if args.model:
+            match = re.match(r".*tempRecon__\d+/(\d+)/.*", args.model)
+            if not match:
+                logging.error("Could not deduce step from path. Starting from zero.")
+                file_starts = 0
+            else:
+                step = int(match.group(1))
+                file_starts = step // args.file_size
+                load_model_all({"model": network}, path=args.model, device=device)
+
+        for file in range(file_starts, 20):
             spectrum = duckdb.read_csv(f"{args.spectrum}_{file}").df().values
             losvd = duckdb.read_csv(f"{args.losvd}_{file}").df().values
             dataloader = DataLoader(
@@ -135,7 +171,7 @@ def main():
             )
             losses = 0
             for i, (x, target) in enumerate(dataloader):
-                current_step = 50000 * file + i
+                current_step = args.file_size * file + i
                 optimizer.zero_grad()
                 pred = network(x.to(device))
                 loss = loss_f(pred, target.to(device))
