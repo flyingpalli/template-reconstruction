@@ -1,0 +1,7 @@
+[data]
+spectrum = "./data/spec"
+losvd = "./data/losvd"
+file_size = 50000
+
+[program]
+log_level = "INFO"

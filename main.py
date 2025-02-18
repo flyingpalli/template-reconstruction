@@ -5,6 +5,7 @@ import re
 import time
 
 import duckdb
+import tomli
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -42,20 +43,6 @@ class ArgParser:
             default=256,
             help="Dimension of the hidden layers in the network",
         )
-        self.parser.add_argument(
-            "--losvd",
-            type=str,
-            default="./data/losvd_split/losvd_scaled",
-            help="Directory which contains the losvd files",
-        )
-        self.parser.add_argument(
-            "--spectrum",
-            type=str,
-            default="./data/spec_split/spec",
-            help="Directory which contains the spec files",
-        )
-        self.parser.add_argument("--log-level", type=str, default="INFO", help="Level of the console logger")
-        self.parser.add_argument("--file-size", type=int, default=50000, help="Amount of lines per file")
         self.parser.add_argument(
             "--model",
             type=str,
@@ -117,6 +104,11 @@ class Network(nn.Module):
         return x
 
 
+def load_config():
+    with open("config.toml", "rb") as fb:
+        return tomli.load(fb)
+
+
 def save_model_all(run_name: str, step: int, state_dict: dict) -> None:
     """
     Save all models and optimizers to a checkpoint file
@@ -146,7 +138,7 @@ def load_model_all(state_dict: dict, path: str, device) -> None:
     checkpoint = torch.load(path, device)
     for name, obj in state_dict.items():
         if name in checkpoint:
-            obj.load_state_dict(checkpoint[name])
+            obj.load_state_dict(checkpoint["name"])
     logging.info(f"Models and optimizers loaded from {path}")
 
 
@@ -154,11 +146,13 @@ def main():
     parser = ArgParser()
     args = parser.parse_args()
 
+    config = load_config()
+
     run_name = f"tempRecon__{int(time.time())}"
     logging.basicConfig(
         format="%(asctime)s %(levelname)s: %(message)s",
         datefmt="%d/%m/%Y %H:%M:%S",
-        level=args.log_level.upper(),
+        level=config["program"]["log_level"].upper(),
     )
 
     try:
@@ -187,14 +181,14 @@ def main():
             match = re.match(r".*tempRecon__\d+/(\d+)/.*", args.model)
             if match:
                 step = int(match.group(1))
-                file_starts = step // args.file_size
+                file_starts = step // config["data"]["file_size"]
                 load_model_all({"model": network}, path=args.model, device=device)
             else:
                 logging.error("Could not deduce step from path. Starting from zero.")
 
         for file in range(file_starts, 20):
-            spectrum = duckdb.read_csv(f"{args.spectrum}_{file}").df().values
-            losvd = duckdb.read_csv(f"{args.losvd}_{file}").df().values
+            spectrum = duckdb.read_csv(f"{config['data']['spectrum']}_{file}").df().values
+            losvd = duckdb.read_csv(f"{config['data']['losvd']}_{file}").df().values
             dataloader = DataLoader(
                 dataset=list(zip(spectrum, losvd)),
                 batch_size=args.batch_size,
@@ -204,7 +198,7 @@ def main():
             )
             losses = 0
             for i, (x, target) in enumerate(dataloader):
-                current_step = args.file_size * file + i
+                current_step = config["data"]["file_size"] * file + i
                 optimizer.zero_grad()
                 pred = network(x.to(device))
                 loss = loss_f(pred, target.to(device))
