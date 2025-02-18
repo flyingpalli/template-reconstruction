@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import time
@@ -90,17 +91,19 @@ def load_model_all(state_dict: dict, path: str, device) -> None:
 
 
 def main():
-    BATCH_SIZE = 1
-    LR = 1e-5
-    LOSVD = "./data/losvd_split/losvd_scaled"
-    SPECTRUM = "./data/spec_split/spec"
-    LOG_LEVEL = "INFO"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--losvd", type=str, default="./data/losvd_split/losvd_scaled")
+    parser.add_argument("--spectrum", type=str, default="./data/spec_split/spec")
+    parser.add_argument("--log-level", default="INFO")
+    args = parser.parse_args()
 
     run_name = f"tempRecon__{int(time.time())}"
     logging.basicConfig(
         format="%(asctime)s %(levelname)s: %(message)s",
         datefmt="%d/%m/%Y %H:%M:%S",
-        level=LOG_LEVEL.upper(),
+        level=args.log_level.upper(),
     )
 
     try:
@@ -118,14 +121,14 @@ def main():
         loss_f = nn.MSELoss(reduction="sum")
 
         network = Network().to(device)
-        optimizer = optim.Adam(network.parameters(), lr=LR)
+        optimizer = optim.Adam(network.parameters(), lr=args.lr)
 
         for file in range(20):
-            spectrum = duckdb.read_csv(f"{SPECTRUM}_{file}").df().values
-            losvd = duckdb.read_csv(f"{LOSVD}_{file}").df().values
+            spectrum = duckdb.read_csv(f"{args.spectrum}_{file}").df().values
+            losvd = duckdb.read_csv(f"{args.losvd}_{file}").df().values
             dataloader = DataLoader(
                 dataset=list(zip(spectrum, losvd)),
-                batch_size=BATCH_SIZE,
+                batch_size=args.batch_size,
                 num_workers=1,
                 shuffle=True,
                 generator=torch.Generator(device=device),
@@ -145,9 +148,7 @@ def main():
     except KeyboardInterrupt:
         logging.warning("KeyboardInterrupt caught! Saving progress...")
     finally:
-        state_dict = {
-            "model": network
-        }
+        state_dict = {"model": network}
         save_model_all(run_name, current_step, state_dict)
 
 
