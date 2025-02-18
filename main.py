@@ -2,10 +2,7 @@ import duckdb
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import typer
 from torch.utils.data import DataLoader
-
-app = typer.Typer()
 
 
 class Network(nn.Module):
@@ -55,7 +52,6 @@ class Network(nn.Module):
         return x
 
 
-@app.command()
 def main():
     BATCH_SIZE = 1
     LR = 1e-5
@@ -102,4 +98,4 @@ def main():
 
 
 if __name__ == "__main__":
-    app()
+    main()
