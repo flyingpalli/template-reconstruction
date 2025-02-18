@@ -11,6 +11,62 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 
+class ArgParser:
+    def __init__(self):
+        self.parser = argparse.ArgumentParser()
+        self.add_arguments()
+
+    def add_arguments(self):
+        self.parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=1,
+            help="Batchsize for supervised learning",
+        )
+        self.parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate of the optimizer")
+        self.parser.add_argument(
+            "--kernel",
+            type=int,
+            default=50,
+            help="Size of the convolution kernel in the convolution layers",
+        )
+        self.parser.add_argument(
+            "--num-layers",
+            type=int,
+            default=10,
+            help="Number of layers in the network",
+        )
+        self.parser.add_argument(
+            "--hidden-dim",
+            type=int,
+            default=256,
+            help="Dimension of the hidden layers in the network",
+        )
+        self.parser.add_argument(
+            "--losvd",
+            type=str,
+            default="./data/losvd_split/losvd_scaled",
+            help="Directory which contains the losvd files",
+        )
+        self.parser.add_argument(
+            "--spectrum",
+            type=str,
+            default="./data/spec_split/spec",
+            help="Directory which contains the spec files",
+        )
+        self.parser.add_argument("--log-level", type=str, default="INFO", help="Level of the console logger")
+        self.parser.add_argument("--file-size", type=int, default=50000, help="Amount of lines per file")
+        self.parser.add_argument(
+            "--model",
+            type=str,
+            default="",
+            help="Path of the model, when pre-loading is desired",
+        )
+
+    def parse_args(self):
+        return self.parser.parse_args()
+
+
 class Network(nn.Module):
     def __init__(
         self,
@@ -39,7 +95,10 @@ class Network(nn.Module):
         self.relu = nn.ReLU()
 
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=hidden_dim, nhead=n_heads, dim_feedforward=hidden_dim * 2
+            d_model=hidden_dim,
+            nhead=n_heads,
+            dim_feedforward=hidden_dim * 2,
+            batch_first=True,
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
@@ -92,37 +151,7 @@ def load_model_all(state_dict: dict, path: str, device) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--batch-size", type=int, default=1, help="Batchsize for supervised learning"
-    )
-    parser.add_argument(
-        "--lr", type=float, default=1e-5, help="Learning rate of the optimizer"
-    )
-    parser.add_argument(
-        "--losvd",
-        type=str,
-        default="./data/losvd_split/losvd_scaled",
-        help="Directory which contains the losvd files",
-    )
-    parser.add_argument(
-        "--spectrum",
-        type=str,
-        default="./data/spec_split/spec",
-        help="Directory which contains the spec files",
-    )
-    parser.add_argument(
-        "--log-level", type=str, default="INFO", help="Level of the console logger"
-    )
-    parser.add_argument(
-        "--file-size", type=int, default=50000, help="Amount of lines per file"
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="",
-        help="Path of the model, when pre-loading is desired",
-    )
+    parser = ArgParser()
     args = parser.parse_args()
 
     run_name = f"tempRecon__{int(time.time())}"
@@ -146,18 +175,22 @@ def main():
 
         loss_f = nn.MSELoss(reduction="sum")
 
-        network = Network().to(device)
+        network = Network(
+            hidden_dim=args.hidden_dim,
+            num_layers=args.num_layers,
+            kernel_size=args.kernel,
+        ).to(device)
         optimizer = optim.Adam(network.parameters(), lr=args.lr)
 
+        file_starts = 0
         if args.model:
             match = re.match(r".*tempRecon__\d+/(\d+)/.*", args.model)
-            if not match:
-                logging.error("Could not deduce step from path. Starting from zero.")
-                file_starts = 0
-            else:
+            if match:
                 step = int(match.group(1))
                 file_starts = step // args.file_size
                 load_model_all({"model": network}, path=args.model, device=device)
+            else:
+                logging.error("Could not deduce step from path. Starting from zero.")
 
         for file in range(file_starts, 20):
             spectrum = duckdb.read_csv(f"{args.spectrum}_{file}").df().values

@@ -11,6 +11,9 @@ extend-ignore = ["E203", "E266", "E501", "W503"]
 [tool.isort]
 profile = "black"
 
+[tool.black]
+line-length = 120
+
 [tool.poetry.dependencies]
 python = "^3.10"
 torch = "^2.5.1"
