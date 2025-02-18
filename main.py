@@ -1,3 +1,7 @@
+import logging
+import os
+import time
+
 import duckdb
 import torch
 import torch.nn as nn
@@ -52,49 +56,99 @@ class Network(nn.Module):
         return x
 
 
+def save_model_all(run_name: str, step: int, state_dict: dict) -> None:
+    """
+    Save all models and optimizers to a checkpoint file
+    :param run_name: The name of the run
+    :param step: The current step
+    :param state_dict: The current state dictionary
+    :return:
+    """
+    model_folder = f"./models/{run_name}/{step}"
+    os.makedirs(model_folder, exist_ok=True)
+    out_path = f"{model_folder}/checkpoint.pth"
+
+    total_state_dict = {name: obj.state_dict() for name, obj in state_dict.items()}
+    torch.save(total_state_dict, out_path)
+    logging.info(f"Saved all models and optimizers to {out_path}")
+
+
+def load_model_all(state_dict: dict, path: str, device) -> None:
+    """
+    Load all models and optimizers from a checkpoint file
+    :param state_dict: The state dictionary to load the models and optimizers into
+    :param path: The path to the model
+    :param device: The torch device
+    :return:
+    """
+    assert os.path.exists(path), "Path to model does not exist"
+    checkpoint = torch.load(path, device)
+    for name, obj in state_dict.items():
+        if name in checkpoint:
+            obj.load_state_dict(checkpoint[name])
+    logging.info(f"Models and optimizers loaded from {path}")
+
+
 def main():
     BATCH_SIZE = 1
     LR = 1e-5
     LOSVD = "./data/losvd_split/losvd_scaled"
     SPECTRUM = "./data/spec_split/spec"
+    LOG_LEVEL = "INFO"
 
-    torch.set_default_dtype(torch.float64)
-    if torch.cuda.is_available():
-        device = "cuda"
-        torch.backends.cudnn.benchmark = True
-    else:
-        device = "cpu"
+    run_name = f"tempRecon__{int(time.time())}"
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s: %(message)s",
+        datefmt="%d/%m/%Y %H:%M:%S",
+        level=LOG_LEVEL.upper(),
+    )
 
-    torch.set_default_device(device)
-    torch.multiprocessing.set_start_method("spawn")
-    print("Using device:", device)
+    try:
+        torch.set_default_dtype(torch.float64)
+        if torch.cuda.is_available():
+            device = "cuda"
+            torch.backends.cudnn.benchmark = True
+        else:
+            device = "cpu"
 
-    loss_f = nn.MSELoss(reduction="sum")
+        torch.set_default_device(device)
+        torch.multiprocessing.set_start_method("spawn")
+        logging.info(f"Using device: {device}")
 
-    network = Network().to(device)
-    optimizer = optim.Adam(network.parameters(), lr=LR)
+        loss_f = nn.MSELoss(reduction="sum")
 
-    for file in range(20):
-        spectrum = duckdb.read_csv(f"{SPECTRUM}_{file}").df().values
-        losvd = duckdb.read_csv(f"{LOSVD}_{file}").df().values
-        dataloader = DataLoader(
-            dataset=list(zip(spectrum, losvd)),
-            batch_size=BATCH_SIZE,
-            num_workers=1,
-            shuffle=True,
-            generator=torch.Generator(device=device),
-        )
-        losses = 0
-        for i, (x, target) in enumerate(dataloader):
-            optimizer.zero_grad()
-            pred = network(x.to(device))
-            loss = loss_f(pred, target.to(device))
-            losses += loss
-            loss.backward()
-            optimizer.step()
-            if i % 10 == 0:
-                print(f"Step {50000 * file + i}, Loss: {losses / 10:.2f}")
-                losses = 0
+        network = Network().to(device)
+        optimizer = optim.Adam(network.parameters(), lr=LR)
+
+        for file in range(20):
+            spectrum = duckdb.read_csv(f"{SPECTRUM}_{file}").df().values
+            losvd = duckdb.read_csv(f"{LOSVD}_{file}").df().values
+            dataloader = DataLoader(
+                dataset=list(zip(spectrum, losvd)),
+                batch_size=BATCH_SIZE,
+                num_workers=1,
+                shuffle=True,
+                generator=torch.Generator(device=device),
+            )
+            losses = 0
+            for i, (x, target) in enumerate(dataloader):
+                current_step = 50000 * file + i
+                optimizer.zero_grad()
+                pred = network(x.to(device))
+                loss = loss_f(pred, target.to(device))
+                losses += loss
+                loss.backward()
+                optimizer.step()
+                if i % 10 == 0:
+                    logging.info(f"Step {current_step}, Loss: {losses / 10:.2f}")
+                    losses = 0
+    except KeyboardInterrupt:
+        logging.warning("KeyboardInterrupt caught! Saving progress...")
+    finally:
+        state_dict = {
+            "model": network
+        }
+        save_model_all(run_name, current_step, state_dict)
 
 
 if __name__ == "__main__":
