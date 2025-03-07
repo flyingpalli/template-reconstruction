@@ -85,7 +85,7 @@ class Network(nn.Module):
             d_model=hidden_dim,
             nhead=n_heads,
             dim_feedforward=hidden_dim * 2,
-            batch_first=True,
+            batch_first=False,
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
