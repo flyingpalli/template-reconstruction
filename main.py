@@ -138,7 +138,7 @@ def load_model_all(state_dict: dict, path: str, device) -> None:
     checkpoint = torch.load(path, device)
     for name, obj in state_dict.items():
         if name in checkpoint:
-            obj.load_state_dict(checkpoint["name"])
+            obj.load_state_dict(checkpoint[name])
     logging.info(f"Models and optimizers loaded from {path}")
 
 
