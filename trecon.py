@@ -61,7 +61,7 @@ def evaluate(
         kernel_size=kernel_size,
     ).to(device)
 
-    network.load_model_all({"model": model}, path=model_path, device=device)
+    model.load_state_dict(torch.load(model_path, weights_only=True, map_location=device))
 
     x = read_spec(spec)
     y = model(x.to(device))
@@ -119,6 +119,7 @@ def train(
                 step = int(match.group(1))
                 file_starts = step // config["data"]["file_size"]
                 network.load_model_all({"model": model}, path=model_path, device=device)
+                logging.info(f"Models and optimizers loaded from {model_path}")
             else:
                 logging.warning("Could not deduce step from path. Starting from zero.")
 
@@ -128,7 +129,7 @@ def train(
             dataloader = DataLoader(
                 dataset=list(zip(spectrum, losvd)),
                 batch_size=batch_size,
-                num_workers=1,
+                num_workers=0,
                 shuffle=True,
                 generator=torch.Generator(device=device),
             )
@@ -143,8 +144,11 @@ def train(
     except KeyboardInterrupt:
         logging.warning("KeyboardInterrupt caught! Saving progress...")
     finally:
-        state_dict = {"model": model}
-        network.save_model_all(run_name, current_step, state_dict)
+        model_folder = f"./models/{run_name}/{current_step}"
+        os.makedirs(model_folder, exist_ok=True)
+        out_path = f"{model_folder}/checkpoint.pth"
+        torch.save(model.state_dict(), out_path)
+        logging.info(f"Saved all models and optimizers to {out_path}")
 
 
 if __name__ == "__main__":
