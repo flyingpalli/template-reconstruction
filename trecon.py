@@ -118,10 +118,10 @@ def train(
             if match:
                 step = int(match.group(1))
                 file_starts = step // config["data"]["file_size"]
-                network.load_model_all({"model": model}, path=model_path, device=device)
-                logging.info(f"Models and optimizers loaded from {model_path}")
             else:
                 logging.warning("Could not deduce step from path. Starting from zero.")
+            network.load_model_all({"model": model, "optimizer": optimizer}, path=model_path, device=device)
+            logging.info(f"Models and optimizers loaded from {model_path}")
 
         for file in range(file_starts, 20):
             spectrum = duckdb.read_csv(f"{config['data']['spectrum']}_{file}").df().values
@@ -144,11 +144,13 @@ def train(
     except KeyboardInterrupt:
         logging.warning("KeyboardInterrupt caught! Saving progress...")
     finally:
-        model_folder = f"./models/{run_name}/{current_step}"
-        os.makedirs(model_folder, exist_ok=True)
-        out_path = f"{model_folder}/checkpoint.pth"
-        torch.save(model.state_dict(), out_path)
-        logging.info(f"Saved all models and optimizers to {out_path}")
+        network.save_model_all(
+            run_name,
+            {
+                "model_state_dict": model,
+                "optimizer_state_dict": optimizer,
+            },
+        )
 
 
 if __name__ == "__main__":
