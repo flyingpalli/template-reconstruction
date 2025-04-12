@@ -121,7 +121,6 @@ def train(
             else:
                 logging.warning("Could not deduce step from path. Starting from zero.")
             network.load_model_all({"model": model, "optimizer": optimizer}, path=model_path, device=device)
-            logging.info(f"Models and optimizers loaded from {model_path}")
 
         for file in range(file_starts, 20):
             spectrum = duckdb.read_csv(f"{config['data']['spectrum']}_{file}").df().values
