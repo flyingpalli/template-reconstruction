@@ -112,6 +112,8 @@ def train(
         ).to(device)
         optimizer = optim.Adam(model.parameters(), lr=lr)
 
+        current_step = 0
+
         file_starts = 0
         if model_path:
             match = re.match(r".*tempRecon__\d+/(\d+)/.*", model_path)
@@ -132,12 +134,16 @@ def train(
                 shuffle=True,
                 generator=torch.Generator(device=device),
             )
+            losses = 0
             for i, (x, target) in enumerate(dataloader):
                 current_step = config["data"]["file_size"] * file + i
                 optimizer.zero_grad()
                 pred = model(x.to(device))
                 loss = loss_f(pred, target.to(device))
-                logging.info(f"Step {current_step}, Loss: {loss:.2f}")
+                losses += loss.item()
+                if i % 10 == 9:
+                    logging.info(f"Step {current_step}, Loss: {(losses/10):.2f}")
+                    losses = 0
                 loss.backward()
                 optimizer.step()
     except KeyboardInterrupt:
@@ -145,9 +151,10 @@ def train(
     finally:
         network.save_model_all(
             run_name,
+            current_step,
             {
-                "model_state_dict": model,
-                "optimizer_state_dict": optimizer,
+                "model": model,
+                "optimizer": optimizer,
             },
         )
 
