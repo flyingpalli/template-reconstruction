@@ -1,0 +1,22 @@
+BootStrap: docker
+From: {{ BASE_IMAGE }}
+
+%post
+  pip install duckdb
+  pip install pandas
+  pip install tomli
+  pip install typer
+
+%environment
+
+%files
+
+%runscript
+
+%labels
+  author Jens Thomas
+  version 1.0
+
+%help
+
+%post
